@@ -1,0 +1,27 @@
+auth:
+  enabled: true
+  rootPassword: "idp-root-password"
+  username: "idp-user"
+  password: "idp-password"
+  database: "idp-catalog"
+
+replicaSet:
+  enabled: true
+  name: "rs0"
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: "standard"
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+service:
+  type: ClusterIP
+  port: 27017
