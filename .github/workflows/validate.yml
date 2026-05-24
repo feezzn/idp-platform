@@ -21,6 +21,7 @@ jobs:
       - name: Install CLI
         run: |
           cd catalog-cli
+          pip install -r requirements.txt
           pip install -e .
 
       - name: Check CLI help

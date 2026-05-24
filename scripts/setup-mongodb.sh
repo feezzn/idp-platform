@@ -1,110 +1,30 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # MongoDB Setup Script - Popula coleções iniciais
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SEED_FILE="$SCRIPT_DIR/setup-mongodb.js"
 MONGO_URI="${MONGO_URI:-mongodb://idp-user:idp-password@localhost:27017/idp-catalog}"
+MONGO_URI_IN_CLUSTER="${MONGO_URI_IN_CLUSTER:-mongodb://idp-user:idp-password@localhost:27017/idp-catalog}"
 
-echo "Connecting to MongoDB: $MONGO_URI"
+echo "Seeding MongoDB catalog..."
 echo ""
 
-mongosh "$MONGO_URI" <<'EOF'
-
-// Use correct database
-use idp-catalog
-
-// Drop collections if exist (for clean slate)
-db.aplicacoes.drop()
-db.configuracoes.drop()
-db.servicos.drop()
-
-// Create collections
-db.createCollection("aplicacoes")
-db.createCollection("configuracoes")
-db.createCollection("servicos")
-
-// COLEÇÃO 1: Aplicações (squads/times)
-db.aplicacoes.insertMany([
-  {
-    "_id": "pmt",
-    "id_capacidade": "pmt",
-    "nome": "Payments Platform",
-    "squad": "Payments Squad",
-    "owner": "Felipe",
-    "created_at": new Date()
-  },
-  {
-    "_id": "ord",
-    "id_capacidade": "ord",
-    "nome": "Orders Platform",
-    "squad": "Orders Squad",
-    "owner": "Felipe",
-    "created_at": new Date()
-  }
-])
-
-// COLEÇÃO 2: Configurações (infra por ambiente)
-db.configuracoes.insertMany([
-  {
-    "_id": "pmt",
-    "ambientes": {
-      "dev": {
-        "aws_account": "999999999999",
-        "aws_region": "us-east-1",
-        "eks_cluster": "idp-dev-cluster",
-        "namespace": "pmt-dev"
-      }
-    }
-  },
-  {
-    "_id": "ord",
-    "ambientes": {
-      "dev": {
-        "aws_account": "999999999999",
-        "aws_region": "us-east-1",
-        "eks_cluster": "idp-dev-cluster",
-        "namespace": "ord-dev"
-      }
-    }
-  }
-])
-
-// COLEÇÃO 3: Serviços
-db.servicos.insertMany([
-  {
-    "_id": "payment-api",
-    "nome": "payment-api",
-    "id_aplicacao": "pmt",
-    "id_capacidade": "pmt",
-    "type": "dotnet",
-    "dotnet_version": "8",
-    "path_solution": "PaymentApi.sln",
-    "path_project": "src/PaymentApi/",
-    "owner": "Felipe",
-    "created_at": new Date()
-  },
-  {
-    "_id": "order-service",
-    "nome": "order-service",
-    "id_aplicacao": "ord",
-    "id_capacidade": "ord",
-    "type": "go",
-    "go_version": "1.21",
-    "owner": "Felipe",
-    "created_at": new Date()
-  }
-])
-
-// Verify data
-print("\n✓ Aplicações:")
-db.aplicacoes.find().pretty()
-
-print("\n✓ Configurações:")
-db.configuracoes.find().pretty()
-
-print("\n✓ Serviços:")
-db.servicos.find().pretty()
-
-EOF
+if command -v mongosh >/dev/null 2>&1; then
+  echo "Using local mongosh: $MONGO_URI"
+  mongosh --quiet "$MONGO_URI" "$SEED_FILE"
+elif command -v kubectl >/dev/null 2>&1 && kubectl get deploy mongodb -n mongodb >/dev/null 2>&1; then
+  echo "Local mongosh not found. Using mongosh inside the mongodb pod."
+  POD_NAME="$(kubectl get pod -n mongodb -l app.kubernetes.io/name=mongodb -o jsonpath='{.items[0].metadata.name}')"
+  kubectl cp -n mongodb "$SEED_FILE" "$POD_NAME:/tmp/setup-mongodb.js" -c mongodb
+  kubectl exec -n mongodb "$POD_NAME" -c mongodb -- mongosh --quiet "$MONGO_URI_IN_CLUSTER" /tmp/setup-mongodb.js
+else
+  echo "Could not find local mongosh or a mongodb deployment in Kubernetes." >&2
+  echo "Install mongosh or run: helm install mongodb bitnami/mongodb --namespace mongodb --create-namespace -f terraform/2-mongodb/values.yaml" >&2
+  exit 1
+fi
 
 echo ""
-echo "✓ Setup complete!"
+echo "Setup complete!"

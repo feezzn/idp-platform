@@ -268,10 +268,17 @@
 [ ] 1.4.2 - Dar permissão
             chmod +x scripts/setup-mongodb.sh
 
-[ ] 1.4.3 - Executar (com port-forward ativo)
+[ ] 1.4.3 - Executar
+            # Usa mongosh local se existir.
+            # Se não existir, usa kubectl exec dentro do pod mongodb.
             ./scripts/setup-mongodb.sh
 
 [ ] 1.4.4 - Verificar dados
+            # Opção A: via CLI do Kubernetes
+            kubectl exec -n mongodb deploy/mongodb -- \
+              mongosh mongodb://idp-user:idp-password@localhost:27017/idp-catalog
+
+            # Opção B: via port-forward + mongosh local
             mongosh mongodb://idp-user:idp-password@localhost:27017/idp-catalog
             
             # no mongosh

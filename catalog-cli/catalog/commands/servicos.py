@@ -38,8 +38,8 @@ def add(nome, aplicacao, type):
         mongo.close()
 
 
-@servicos.command()
-def list():
+@servicos.command("list")
+def list_services():
     """List all services"""
     mongo = MongoConnection()
     db = mongo.get_db()
